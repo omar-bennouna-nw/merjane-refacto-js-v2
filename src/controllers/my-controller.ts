@@ -1,11 +1,9 @@
-/* eslint-disable @typescript-eslint/switch-exhaustiveness-check */
-/* eslint-disable max-depth */
 /* eslint-disable no-await-in-loop */
 import {eq} from 'drizzle-orm';
 import fastifyPlugin from 'fastify-plugin';
 import {serializerCompiler, validatorCompiler, type ZodTypeProvider} from 'fastify-type-provider-zod';
 import {z} from 'zod';
-import {orders, products} from '@/db/schema.js';
+import {orders} from '@/db/schema.js';
 import {parseProductType} from '@/domain/product/product-type.js';
 
 export const myController = fastifyPlugin(async server => {
@@ -34,57 +32,17 @@ export const myController = fastifyPlugin(async server => {
 					},
 				},
 			}))!;
-		console.log(order);
 		const {products: productList} = order;
 
-		if (productList) {
-			// Fail fast: validate every type before touching any stock, so an order is never half-processed.
-			const productTypes = productList.map(({product}) => parseProductType(product.type));
+		// Fail fast: validate every type before touching any stock
+		for (const {product} of productList) {
+			parseProductType(product.type);
+		}
 
-			for (const [index, {product: p}] of productList.entries()) {
-				switch (productTypes[index]) {
-					case 'NORMAL': {
-						if (p.available > 0) {
-							p.available -= 1;
-							await dbse.update(products).set(p).where(eq(products.id, p.id));
-						} else {
-							const {leadTime} = p;
-							if (leadTime > 0) {
-								await ps.notifyDelay(leadTime, p);
-							}
-						}
-
-						break;
-					}
-
-					case 'SEASONAL': {
-						const currentDate = new Date();
-						if (currentDate > p.seasonStartDate! && currentDate < p.seasonEndDate! && p.available > 0) {
-							p.available -= 1;
-							await dbse.update(products).set(p).where(eq(products.id, p.id));
-						} else {
-							await ps.handleSeasonalProduct(p);
-						}
-
-						break;
-					}
-
-					case 'EXPIRABLE': {
-						const currentDate = new Date();
-						if (p.available > 0 && p.expiryDate! > currentDate) {
-							p.available -= 1;
-							await dbse.update(products).set(p).where(eq(products.id, p.id));
-						} else {
-							await ps.handleExpiredProduct(p);
-						}
-
-						break;
-					}
-				}
-			}
+		for (const {product} of productList) {
+			await ps.processProduct(product);
 		}
 
 		await reply.send({orderId: order.id});
 	});
 });
-
