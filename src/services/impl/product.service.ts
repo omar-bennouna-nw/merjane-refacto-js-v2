@@ -7,6 +7,9 @@ import {parseProductType} from '@/domain/product/product-type.js';
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/**
+ * Applique les règles de vente d'un produit commandé, selon son type.
+ */
 export class ProductService {
 	private readonly ns: INotificationService;
 	private readonly db: Database;
