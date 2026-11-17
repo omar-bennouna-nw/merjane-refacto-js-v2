@@ -184,17 +184,4 @@ describe('processOrder — comportement existant', () => {
 			expectNotification(product, expectation);
 		});
 	});
-
-	describe('produit de type inconnu', () => {
-		it('est ignoré silencieusement (comportement actuel, à remplacer par une erreur métier)', async () => {
-			const product: ProductInsert = {
-				type: 'UNKNOWN', name: 'unknown-type', leadTime: 5, available: 10,
-			};
-
-			const result = await processOrderWith(product);
-
-			expect(result!.available).toBe(10);
-			expectNotification(product, {available: 10});
-		});
-	});
 });

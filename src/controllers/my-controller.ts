@@ -6,6 +6,7 @@ import fastifyPlugin from 'fastify-plugin';
 import {serializerCompiler, validatorCompiler, type ZodTypeProvider} from 'fastify-type-provider-zod';
 import {z} from 'zod';
 import {orders, products} from '@/db/schema.js';
+import {parseProductType} from '@/domain/product/product-type.js';
 
 export const myController = fastifyPlugin(async server => {
 	// Add schema validator and serializer
@@ -34,12 +35,14 @@ export const myController = fastifyPlugin(async server => {
 				},
 			}))!;
 		console.log(order);
-		const ids: number[] = [request.params.orderId];
 		const {products: productList} = order;
 
 		if (productList) {
-			for (const {product: p} of productList) {
-				switch (p.type) {
+			// Fail fast: validate every type before touching any stock, so an order is never half-processed.
+			const productTypes = productList.map(({product}) => parseProductType(product.type));
+
+			for (const [index, {product: p}] of productList.entries()) {
+				switch (productTypes[index]) {
 					case 'NORMAL': {
 						if (p.available > 0) {
 							p.available -= 1;

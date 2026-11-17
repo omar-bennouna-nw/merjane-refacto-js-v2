@@ -52,6 +52,37 @@ describe('MyController Integration Tests', () => {
 		expect(resultOrder!.id).toBe(orderId);
 	});
 
+	it('ProcessOrderShouldReturn422WhenAProductTypeIsUnknown', async () => {
+		const client = supertest(fastify.server);
+		const orderId = database.transaction(tx => {
+			const productList = tx.insert(products).values([
+				{
+					leadTime: 15, available: 30, type: 'NORMAL', name: 'USB Cable',
+				},
+				{
+					leadTime: 5, available: 10, type: 'UNKNOWN', name: 'Mystery Box',
+				},
+			]).returning({productId: products.id}).all();
+			const order = tx.insert(orders).values([{}]).returning({orderId: orders.id}).get();
+			tx.insert(ordersToProducts).values(productList.map(p => ({orderId: order.orderId, productId: p.productId}))).run();
+			return order.orderId;
+		});
+
+		const response = await client.post(`/orders/${orderId}/processOrder`).expect(422);
+
+		expect(response.body).toEqual({
+			statusCode: 422,
+			error: 'Unprocessable Entity',
+			message: 'Unknown product type: "UNKNOWN"',
+		});
+		const cable = await database.query.products.findFirst({where: eq(products.name, 'USB Cable')});
+		expect(cable!.available).toBe(30);
+	});
+
+	it('ProcessOrderShouldReturn400WhenOrderIdIsNotANumber', async () => {
+		await supertest(fastify.server).post('/orders/abc/processOrder').expect(400);
+	});
+
 	function createProducts(): ProductInsert[] {
 		const d = 24 * 60 * 60 * 1000;
 		return [
