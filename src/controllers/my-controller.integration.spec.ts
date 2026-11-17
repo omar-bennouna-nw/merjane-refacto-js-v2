@@ -79,6 +79,16 @@ describe('MyController Integration Tests', () => {
 		expect(cable!.available).toBe(30);
 	});
 
+	it('ProcessOrderShouldReturn422WhenTheOrderDoesNotExist', async () => {
+		const response = await supertest(fastify.server).post('/orders/404/processOrder').expect(422);
+
+		expect(response.body).toEqual({
+			statusCode: 422,
+			error: 'Unprocessable Entity',
+			message: 'Order 404 not found',
+		});
+	});
+
 	it('ProcessOrderShouldReturn400WhenOrderIdIsNotANumber', async () => {
 		await supertest(fastify.server).post('/orders/abc/processOrder').expect(400);
 	});

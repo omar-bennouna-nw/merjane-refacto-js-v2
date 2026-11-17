@@ -1,10 +1,6 @@
-/* eslint-disable no-await-in-loop */
-import {eq} from 'drizzle-orm';
 import fastifyPlugin from 'fastify-plugin';
 import {serializerCompiler, validatorCompiler, type ZodTypeProvider} from 'fastify-type-provider-zod';
 import {z} from 'zod';
-import {orders} from '@/db/schema.js';
-import {parseProductType} from '@/domain/product/product-type.js';
 
 export const myController = fastifyPlugin(async server => {
 	// Add schema validator and serializer
@@ -18,31 +14,10 @@ export const myController = fastifyPlugin(async server => {
 			}),
 		},
 	}, async (request, reply) => {
-		const dbse = server.diContainer.resolve('db');
-		const ps = server.diContainer.resolve('ps');
-		const order = (await dbse.query.orders
-			.findFirst({
-				where: eq(orders.id, request.params.orderId),
-				with: {
-					products: {
-						columns: {},
-						with: {
-							product: true,
-						},
-					},
-				},
-			}))!;
-		const {products: productList} = order;
+		const {orderId} = request.params;
 
-		// Fail fast: validate every type before touching any stock
-		for (const {product} of productList) {
-			parseProductType(product.type);
-		}
+		await server.diContainer.resolve('os').processOrder(orderId);
 
-		for (const {product} of productList) {
-			await ps.processProduct(product);
-		}
-
-		await reply.send({orderId: order.id});
+		await reply.send({orderId});
 	});
 });
