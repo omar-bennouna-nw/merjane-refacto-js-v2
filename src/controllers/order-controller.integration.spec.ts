@@ -42,11 +42,14 @@ describe('OrderController Integration Tests', () => {
 		const orderId = database.transaction(tx => {
 			const productList = tx.insert(products).values(allProducts).returning({productId: products.id}).all();
 			const order = tx.insert(orders).values([{}]).returning({orderId: orders.id}).get();
-			tx.insert(ordersToProducts).values(productList.map(p => ({orderId: order!.orderId, productId: p.productId}))).run();
-			return order!.orderId;
+			tx.insert(ordersToProducts).values(productList.map(p => ({orderId: order.orderId, productId: p.productId}))).run();
+			return order.orderId;
 		});
 
-		await client.post(`/orders/${orderId}/processOrder`).expect(200).expect('Content-Type', /application\/json/);
+		await client.post(`/orders/${orderId}/processOrder`)
+			.expect(200)
+			.expect('Content-Type', /application\/json/)
+			.expect({orderId});
 
 		const resultOrder = await database.query.orders.findFirst({where: eq(orders.id, orderId)});
 		expect(resultOrder!.id).toBe(orderId);
